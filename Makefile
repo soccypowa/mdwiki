@@ -1,7 +1,7 @@
 VERSION ?= dev
 BUILD_TIME := $(shell date -u '+%Y-%m-%d_%H:%M:%S')
 GIT_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
-BINARY_NAME := myapp
+BINARY_NAME := mdwiki
 TARGETS := windows/amd64 linux/amd64 linux/arm64 darwin/amd64 darwin/arm64
 
 test:
