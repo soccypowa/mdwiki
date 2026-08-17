@@ -9,6 +9,7 @@ import (
 func serve(root string, port int) error {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", makeHandler(root))
+	mux.HandleFunc("/search", searchHandler(root))
 	mux.HandleFunc("/_static/htmx.min.js", serveHtmx)
 
 	addr := fmt.Sprintf(":%d", port)
