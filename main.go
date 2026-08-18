@@ -11,7 +11,7 @@ import (
 func main() {
 	dir, port := parseFlags(os.Args[1:])
 	if dir == "" {
-		fmt.Fprintln(os.Stderr, "usage: mdserve <folder> [port] (or: mdserve -dir <folder> -port <port>)")
+		fmt.Fprintln(os.Stderr, "usage: mdwiki <folder> [port] (or: mdwiki -dir <folder> -port <port>)")
 		os.Exit(1)
 	}
 
