@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"bytes"
 	"strings"
 	"testing"
 )
