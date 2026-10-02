@@ -6,16 +6,37 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
+var (
+	Version   = "dev"
+	GitCommit = ""
+	BuildTime = ""
+)
+
+type cliOptions struct {
+	dir         string
+	port        int
+	showVersion bool
+}
+
 func main() {
-	dir, port := parseFlags(os.Args[1:])
-	if dir == "" {
+	options, err := parseFlags(os.Args[1:])
+	if err != nil {
+		os.Exit(2)
+	}
+	if options.showVersion {
+		fmt.Println(versionInfo())
+		return
+	}
+
+	if options.dir == "" {
 		fmt.Fprintln(os.Stderr, "usage: mdwiki <folder> [port] (or: mdwiki -dir <folder> -port <port>)")
 		os.Exit(1)
 	}
 
-	absDir, err := filepath.Abs(dir)
+	absDir, err := filepath.Abs(options.dir)
 	if err != nil {
 		log.Fatalf("resolving folder: %v", err)
 	}
@@ -23,31 +44,46 @@ func main() {
 		log.Fatalf("not a directory: %s", absDir)
 	}
 
-	if err := serve(absDir, port); err != nil {
+	if err := serve(absDir, options.port); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func parseFlags(args []string) (string, int) {
+func parseFlags(args []string) (cliOptions, error) {
 	fs := flag.NewFlagSet("mdwiki", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 
 	dirFlag := fs.String("dir", "", "path to the docs folder (root of the markdown wiki)")
 	portFlag := fs.Int("port", 8888, "port to listen on")
+	versionFlag := fs.Bool("version", false, "Show version information and exit")
 
 	if err := fs.Parse(args); err != nil {
-		os.Exit(2)
+		return cliOptions{}, err
 	}
 
-	dir := *dirFlag
-	port := *portFlag
+	options := cliOptions{
+		dir:         *dirFlag,
+		port:        *portFlag,
+		showVersion: *versionFlag,
+	}
 
 	positional := fs.Args()
-	if dir == "" && len(positional) >= 1 {
-		dir = positional[0]
+	if options.dir == "" && len(positional) >= 1 {
+		options.dir = positional[0]
 	}
 	if len(positional) >= 2 {
-		_, _ = fmt.Sscanf(positional[1], "%d", &port)
+		_, _ = fmt.Sscanf(positional[1], "%d", &options.port)
 	}
-	return dir, port
+	return options, nil
+}
+
+func versionInfo() string {
+	parts := []string{"mdwiki " + Version}
+	if GitCommit != "" {
+		parts = append(parts, "commit "+GitCommit)
+	}
+	if BuildTime != "" {
+		parts = append(parts, "built "+BuildTime)
+	}
+	return strings.Join(parts, ", ")
 }
