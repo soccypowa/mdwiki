@@ -33,8 +33,45 @@ var md = goldmark.New(
 	goldmark.WithRendererOptions(html.WithUnsafe()),
 )
 
+func safeFileServer(root string) http.Handler {
+	rootPath, err := filepath.Abs(root)
+	if err != nil {
+		rootPath = root
+	}
+	resolvedRoot, err := filepath.EvalSymlinks(rootPath)
+	if err != nil {
+		resolvedRoot = rootPath
+	}
+	fileServer := http.FileServer(http.Dir(rootPath))
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		urlPath := path.Clean("/" + r.URL.Path)
+		candidate := filepath.Join(rootPath, filepath.FromSlash(strings.TrimPrefix(urlPath, "/")))
+		if fi, err := os.Lstat(candidate); err == nil && fi.Mode()&os.ModeSymlink != 0 {
+			http.NotFound(w, r)
+			return
+		}
+
+		resolvedCandidate, err := filepath.EvalSymlinks(candidate)
+		if err == nil {
+			rel, err := filepath.Rel(resolvedRoot, resolvedCandidate)
+			if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+				http.NotFound(w, r)
+				return
+			}
+			fileServer.ServeHTTP(w, r)
+			return
+		}
+		if !os.IsNotExist(err) {
+			http.NotFound(w, r)
+			return
+		}
+		fileServer.ServeHTTP(w, r)
+	})
+}
+
 func makeHandler(root string) func(http.ResponseWriter, *http.Request) {
-	fileServer := http.FileServer(http.Dir(root))
+	fileServer := safeFileServer(root)
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		urlPath := path.Clean("/" + r.URL.Path)
@@ -43,6 +80,21 @@ func makeHandler(root string) func(http.ResponseWriter, *http.Request) {
 		if !ok {
 			fileServer.ServeHTTP(w, r)
 			return
+		}
+		if isIndexFile(root, mdFile) {
+			rel, err := filepath.Rel(root, mdFile)
+			if err == nil {
+				canonicalPath := "/"
+				if rel != "index.md" {
+					canonicalPath = "/" + filepath.ToSlash(filepath.Join(filepath.Dir(rel), "index"))
+				}
+				if urlPath != canonicalPath {
+					target := *r.URL
+					target.Path = canonicalPath
+					http.Redirect(w, r, target.String(), http.StatusPermanentRedirect)
+					return
+				}
+			}
 		}
 
 		src, err := os.ReadFile(mdFile)
@@ -63,7 +115,7 @@ func makeHandler(root string) func(http.ResponseWriter, *http.Request) {
 
 		data := pageData{
 			Title:      titleFor(urlPath),
-			Breadcrumb: breadcrumbHTML(urlPath),
+			Breadcrumb: breadcrumbHTML(root, urlPath),
 			Content:    template.HTML(content.String()),
 		}
 		if err := pageTemplate.Execute(w, data); err != nil {
@@ -78,7 +130,7 @@ func searchHandler(root string) http.HandlerFunc {
 
 		q := strings.TrimSpace(r.URL.Query().Get("q"))
 		if q == "" {
-			fmt.Fprint(w, `<p class="search-hint>Type to search...</p>`)
+			fmt.Fprint(w, `<p class="search-hint">Type to search...</p>`)
 			return
 		}
 		needle := strings.ToLower(q)
@@ -116,8 +168,7 @@ func searchHandler(root string) http.HandlerFunc {
 				return nil
 			}
 			url := "/" + strings.TrimSuffix(filepath.ToSlash(rel), ".md")
-			url = strings.TrimSuffix(url, "/index")
-			if url == "" {
+			if url == "/index" {
 				url = "/"
 			}
 
@@ -139,14 +190,14 @@ func searchHandler(root string) http.HandlerFunc {
 		}
 
 		if len(results) == 0 {
-			fmt.Fprintf(w, `<p class="search-empry>No results for &quot;%s&quot;</p>`, template.HTMLEscapeString(q))
+			fmt.Fprintf(w, `<p class="search-empty">No results for &quot;%s&quot;</p>`, template.HTMLEscapeString(q))
 			return
 		}
 
 		var b strings.Builder
-		b.WriteString(`<ul class="search-result"`)
+		b.WriteString(`<ul class="search-results">`)
 		for _, res := range results {
-			fmt.Fprintf(&b, `<li><a href="%s">%s</a>%s</li>`,
+			fmt.Fprintf(&b, `<li><a href="%s" hx-boost="false">%s</a>%s</li>`,
 				template.HTMLEscapeString(res.URL),
 				template.HTMLEscapeString(res.Title),
 				res.Snippet,

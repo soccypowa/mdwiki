@@ -95,6 +95,13 @@ func titleFor(urlPath string) string {
 		return "home"
 	}
 	base := path.Base(urlPath)
+	if base == "index" {
+		urlPath = path.Dir(urlPath)
+		if urlPath == "/" {
+			return "home"
+		}
+		base = path.Base(urlPath)
+	}
 	base = strings.ReplaceAll(base, "-", " ")
 	base = strings.ReplaceAll(base, "_", " ")
 
@@ -102,21 +109,37 @@ func titleFor(urlPath string) string {
 	return caser.String(base)
 }
 
-func breadcrumbHTML(urlPath string) template.HTML {
+func breadcrumbHTML(root, urlPath string) template.HTML {
 	if urlPath == "/" {
 		return ""
 	}
 	parts := strings.Split(strings.Trim(urlPath, "/"), "/")
+	indexRoute := parts[len(parts)-1] == "index"
+	if indexRoute {
+		parts = parts[:len(parts)-1]
+	}
 	var b strings.Builder
 	acc := ""
 	for i, p := range parts {
 		acc += "/" + p
+		href := acc
+		if i < len(parts)-1 || indexRoute {
+			indexFile := filepath.Join(root, filepath.FromSlash(strings.TrimPrefix(acc, "/")), "index.md")
+			if fi, err := statSafe(indexFile); err == nil && !fi.IsDir() {
+				href += "/index"
+			}
+		}
 		if i > 0 {
 			b.WriteString(" / ")
 		} else {
 			b.WriteString("/ ")
 		}
-		fmt.Fprintf(&b, `<a href="%s">%s</a>`, acc, template.HTMLEscapeString(p))
+		fmt.Fprintf(&b, `<a href="%s">%s</a>`, href, template.HTMLEscapeString(p))
 	}
 	return template.HTML(b.String())
+}
+
+func isIndexFile(root, file string) bool {
+	rel, err := filepath.Rel(root, file)
+	return err == nil && filepath.Base(rel) == "index.md"
 }

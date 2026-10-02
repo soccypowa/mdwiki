@@ -20,9 +20,11 @@ mdwiki -dir <folder> -port <port>
 - `<port>` — defaults to 8888 if omitted
 
 Visiting `/` serves `<folder>/index.md`. Visiting `/foo` serves
-`<folder>/foo.md` if it exists, otherwise `<folder>/foo/index.md`. Any
-non-markdown file (images, PDFs, etc.) referenced from your docs is served
-as a static file straight from disk.
+`<folder>/foo.md` if it exists, otherwise redirects to `/foo/index` and serves
+`<folder>/foo/index.md`. The explicit `/index` URL keeps relative links on
+directory index pages rooted in the correct folder. Any non-markdown file
+(images, PDFs, etc.) referenced from your docs is served as a static file
+straight from disk.
 
 ## How link rewriting works
 

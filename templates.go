@@ -157,6 +157,12 @@ var pageTemplate = template.Must(template.New("page").Parse(`<!DOCTYPE html>
 
   if (!window.mdwikiCopyButtonsInitialized) {
     window.mdwikiCopyButtonsInitialized = true;
+    document.addEventListener("mousedown", event => {
+      const target = event.target;
+      if (target instanceof Element && target.closest("#search-results a")) {
+        event.preventDefault();
+      }
+    });
     document.addEventListener("DOMContentLoaded", () => addCodeCopyButtons(document));
     document.addEventListener("htmx:load", event => addCodeCopyButtons(event.detail.elt));
   }
