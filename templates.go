@@ -39,6 +39,20 @@ var pageTemplate = template.Must(template.New("page").Parse(`<!DOCTYPE html>
   pre { background: #8881; padding: 0.75rem 1rem; overflow-x: auto; border-radius: 6px; }
   code { background: #8881; padding: 0.15em 0.4em; border-radius: 4px; }
   pre code { background: none; padding: 0; }
+  .code-block { position: relative; }
+  .code-block > pre { padding-top: 2.5rem; }
+  .code-copy {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    padding: 0.2rem 0.5rem;
+    border: 1px solid #8886;
+    border-radius: 4px;
+    background: Canvas;
+    color: CanvasText;
+    cursor: pointer;
+  }
+  .code-copy:focus-visible { outline: 2px solid #4488ff; outline-offset: 2px; }
   table { border-collapse: collapse; }
   th, td { border: 1px solid #8886; padding: 0.4em 0.8em; }
   img { max-width: 100%; }
@@ -96,6 +110,53 @@ var pageTemplate = template.Must(template.New("page").Parse(`<!DOCTYPE html>
 <main>
 {{.Content}}
 </main>
+<script>
+  function addCodeCopyButtons(root) {
+    const blocks = [];
+    if (root instanceof Element && root.matches("pre")) blocks.push(root);
+    blocks.push(...root.querySelectorAll("pre"));
+
+    for (const pre of blocks) {
+      if (pre.dataset.copyButton === "true") continue;
+      pre.dataset.copyButton = "true";
+
+      const wrapper = document.createElement("div");
+      wrapper.className = "code-block";
+      pre.parentNode.insertBefore(wrapper, pre);
+      wrapper.appendChild(pre);
+
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "code-copy";
+      button.textContent = "Copy";
+      button.setAttribute("aria-label", "Copy code");
+      wrapper.appendChild(button);
+
+      button.addEventListener("click", async () => {
+        try {
+          const code = pre.querySelector("code")?.textContent ?? pre.textContent ?? "";
+          await navigator.clipboard.writeText(code);
+          button.textContent = "Copied";
+          button.setAttribute("aria-label", "Code copied");
+        } catch {
+          button.textContent = "Copy failed";
+          button.setAttribute("aria-label", "Copy code failed");
+        }
+
+        window.setTimeout(() => {
+          button.textContent = "Copy";
+          button.setAttribute("aria-label", "Copy code");
+        }, 1500);
+      });
+    }
+  }
+
+  if (!window.mdwikiCopyButtonsInitialized) {
+    window.mdwikiCopyButtonsInitialized = true;
+    document.addEventListener("DOMContentLoaded", () => addCodeCopyButtons(document));
+    document.addEventListener("htmx:load", event => addCodeCopyButtons(event.detail.elt));
+  }
+</script>
 </body>
 </html>
 `))
