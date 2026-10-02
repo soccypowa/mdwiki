@@ -40,7 +40,6 @@ var pageTemplate = template.Must(template.New("page").Parse(`<!DOCTYPE html>
   code { background: #8881; padding: 0.15em 0.4em; border-radius: 4px; }
   pre code { background: none; padding: 0; }
   .code-block { position: relative; }
-  .code-block > pre { padding-top: 2.5rem; }
   .code-copy {
     position: absolute;
     top: 0.5rem;
@@ -51,7 +50,9 @@ var pageTemplate = template.Must(template.New("page").Parse(`<!DOCTYPE html>
     background: Canvas;
     color: CanvasText;
     cursor: pointer;
+    transition: opacity 120ms ease, visibility 120ms;
   }
+  .code-block-scrolled .code-copy { opacity: 0; visibility: hidden; pointer-events: none; }
   .code-copy:focus-visible { outline: 2px solid #4488ff; outline-offset: 2px; }
   table { border-collapse: collapse; }
   th, td { border: 1px solid #8886; padding: 0.4em 0.8em; }
@@ -124,6 +125,9 @@ var pageTemplate = template.Must(template.New("page").Parse(`<!DOCTYPE html>
       wrapper.className = "code-block";
       pre.parentNode.insertBefore(wrapper, pre);
       wrapper.appendChild(pre);
+      pre.addEventListener("scroll", () => {
+        wrapper.classList.toggle("code-block-scrolled", pre.scrollLeft > 0);
+      }, { passive: true });
 
       const button = document.createElement("button");
       button.type = "button";
