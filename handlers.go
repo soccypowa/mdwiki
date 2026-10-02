@@ -31,8 +31,45 @@ var md = goldmark.New(
 	goldmark.WithRendererOptions(html.WithUnsafe()),
 )
 
+func safeFileServer(root string) http.Handler {
+	rootPath, err := filepath.Abs(root)
+	if err != nil {
+		rootPath = root
+	}
+	resolvedRoot, err := filepath.EvalSymlinks(rootPath)
+	if err != nil {
+		resolvedRoot = rootPath
+	}
+	fileServer := http.FileServer(http.Dir(rootPath))
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		urlPath := path.Clean("/" + r.URL.Path)
+		candidate := filepath.Join(rootPath, filepath.FromSlash(strings.TrimPrefix(urlPath, "/")))
+		if fi, err := os.Lstat(candidate); err == nil && fi.Mode()&os.ModeSymlink != 0 {
+			http.NotFound(w, r)
+			return
+		}
+
+		resolvedCandidate, err := filepath.EvalSymlinks(candidate)
+		if err == nil {
+			rel, err := filepath.Rel(resolvedRoot, resolvedCandidate)
+			if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+				http.NotFound(w, r)
+				return
+			}
+			fileServer.ServeHTTP(w, r)
+			return
+		}
+		if !os.IsNotExist(err) {
+			http.NotFound(w, r)
+			return
+		}
+		fileServer.ServeHTTP(w, r)
+	})
+}
+
 func makeHandler(root string) func(http.ResponseWriter, *http.Request) {
-	fileServer := http.FileServer(http.Dir(root))
+	fileServer := safeFileServer(root)
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		urlPath := path.Clean("/" + r.URL.Path)
