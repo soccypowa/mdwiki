@@ -9,6 +9,16 @@ import (
 	"testing"
 )
 
+func TestMarkdownHeadingIDs(t *testing.T) {
+	var output bytes.Buffer
+	if err := md.Convert([]byte("# Getting Started"), &output); err != nil {
+		t.Fatalf("md.Convert() error = %v", err)
+	}
+	if !strings.Contains(output.String(), `<h1 id="getting-started">Getting Started</h1>`) {
+		t.Fatalf("rendered Markdown has no heading ID: %s", output.String())
+	}
+}
+
 func TestRewriteDestination(t *testing.T) {
 	tests := []struct {
 		name string

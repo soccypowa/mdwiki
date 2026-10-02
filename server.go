@@ -13,6 +13,7 @@ func serve(root string, port int) error {
 	mux.HandleFunc("/_static/htmx.min.js", serveHtmx)
 
 	addr := fmt.Sprintf(":%d", port)
+	log.Println(VersionInfo())
 	log.Printf("serving %s on http://localhost%s", root, addr)
 	return http.ListenAndServe(addr, recoverMiddleware(logRequests(mux)))
 }
