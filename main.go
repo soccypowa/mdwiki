@@ -27,7 +27,7 @@ func main() {
 		os.Exit(2)
 	}
 	if options.showVersion {
-		fmt.Println(versionInfo())
+		fmt.Println(VersionInfo())
 		return
 	}
 
@@ -77,7 +77,7 @@ func parseFlags(args []string) (cliOptions, error) {
 	return options, nil
 }
 
-func versionInfo() string {
+func VersionInfo() string {
 	parts := []string{"mdwiki " + Version}
 	if GitCommit != "" {
 		parts = append(parts, "commit "+GitCommit)
