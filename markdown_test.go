@@ -81,3 +81,57 @@ func TestTitleForDirectoryIndex(t *testing.T) {
 		t.Fatalf("titleFor() = %q, want %q", got, want)
 	}
 }
+
+func TestSearchHandlerResponseMarkup(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "guide.md"), []byte("# Go Guide\nSearchable text."), 0644); err != nil {
+		t.Fatal(err)
+	}
+	handler := searchHandler(root)
+
+	tests := []struct {
+		name  string
+		query string
+		want  string
+	}{
+		{name: "empty query hint", want: `<p class="search-hint">`},
+		{name: "matching result", query: "searchable", want: `<ul class="search-results"><li><a href="/guide" hx-boost="false">Go Guide</a>`},
+		{name: "empty result", query: "missing", want: `<p class="search-empty">No results for &quot;missing&quot;</p>`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/search?q="+tt.query, nil)
+			res := httptest.NewRecorder()
+			handler.ServeHTTP(res, req)
+			if !strings.Contains(res.Body.String(), tt.want) {
+				t.Fatalf("response body %q does not contain %q", res.Body.String(), tt.want)
+			}
+		})
+	}
+}
+
+func TestSearchResultForDirectoryIndexUsesCanonicalRoute(t *testing.T) {
+	root := t.TempDir()
+	indexPath := filepath.Join(root, "guide", "index.md")
+	if err := os.MkdirAll(filepath.Dir(indexPath), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(indexPath, []byte("# Guide\nCanonicalIndexNeedle"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	searchReq := httptest.NewRequest(http.MethodGet, "/search?q=CanonicalIndexNeedle", nil)
+	searchRes := httptest.NewRecorder()
+	searchHandler(root).ServeHTTP(searchRes, searchReq)
+	if !strings.Contains(searchRes.Body.String(), `href="/guide/index" hx-boost="false"`) {
+		t.Fatalf("search response does not link to canonical route: %q", searchRes.Body.String())
+	}
+
+	pageReq := httptest.NewRequest(http.MethodGet, "/guide/index", nil)
+	pageRes := httptest.NewRecorder()
+	makeHandler(root)(pageRes, pageReq)
+	if pageRes.Code != http.StatusOK {
+		t.Fatalf("canonical route status = %d, want %d", pageRes.Code, http.StatusOK)
+	}
+}
