@@ -42,6 +42,21 @@ func makeHandler(root string) func(http.ResponseWriter, *http.Request) {
 			fileServer.ServeHTTP(w, r)
 			return
 		}
+		if isIndexFile(root, mdFile) {
+			rel, err := filepath.Rel(root, mdFile)
+			if err == nil {
+				canonicalPath := "/"
+				if rel != "index.md" {
+					canonicalPath = "/" + filepath.ToSlash(filepath.Join(filepath.Dir(rel), "index"))
+				}
+				if urlPath != canonicalPath {
+					target := *r.URL
+					target.Path = canonicalPath
+					http.Redirect(w, r, target.String(), http.StatusPermanentRedirect)
+					return
+				}
+			}
+		}
 
 		src, err := os.ReadFile(mdFile)
 		if err != nil {
@@ -61,7 +76,7 @@ func makeHandler(root string) func(http.ResponseWriter, *http.Request) {
 
 		data := pageData{
 			Title:      titleFor(urlPath),
-			Breadcrumb: breadcrumbHTML(urlPath),
+			Breadcrumb: breadcrumbHTML(root, urlPath),
 			Content:    template.HTML(content.String()),
 		}
 		if err := pageTemplate.Execute(w, data); err != nil {
